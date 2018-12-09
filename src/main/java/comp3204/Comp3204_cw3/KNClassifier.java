@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Vector;
 
@@ -19,52 +20,70 @@ import org.openimaj.image.FImage;
 import org.openimaj.image.processing.resize.ResizeProcessor;
 
 public class KNClassifier {
+	int k;
 	HashMap<String, List<Vector<Float>>> vectorList;
 
-	public KNClassifier() {
-
+	public KNClassifier(int k) {
+		this.k = k;
 	}
 
-	public void test(VFSListDataset<FImage> testImages) throws InterruptedException {
+	public void test(VFSListDataset<FImage> testImages) throws InterruptedException, IOException {
 
-		List<Vector<Float>> testVectors  = configure(testImages);
+		List<Vectors> testVectors  = configure(testImages);
 		List<Result> results = new ArrayList<Result>();
 		List<List<Result>> resultsList = new ArrayList<List<Result>>();
-
-		for(Vector<Float> b : testVectors ) {
-			int count= 0;
+		for(Vectors b : testVectors ) {
 			for(String label : vectorList.keySet()) {
 				for(Vector<Float> v : vectorList.get(label)) {
 					float distance = 0;
-					for(int i = 0; i<b.size(); i++) {
-						distance += Math.pow(b.get(i)-v.get(i), 2);
+					for(int i = 0; i<b.getVector().size(); i++) {
+						distance += Math.pow(b.getVector().get(i)-v.get(i), 2);
 					}
 					distance = (float) Math.sqrt(distance);
-					results.add(new Result(label, count, distance));
+					results.add(new Result(label, b.getImgName(), distance));
 				}
 			}
 			resultsList.add(results);
-			count++;
 		}
-
-		System.out.println(resultsList.size());
+		
+		
+		FileWriter fw = null;
 		for(List<Result> l : resultsList) {
 			Collections.sort(l, new ResultSorter());
+			fw = new FileWriter("run1.txt");
+			fw.write(l.get(0).getName() + "   " + decideBest(l));
+			System.out.println(l.get(0).getName() + "   " + decideBest(l));
 		}
-
-		for(List<Result> l : resultsList) {
-			for(int i = 0; i < l.size(); i++) {
-				DisplayUtilities.display(l.get(i).getLabel(), testImages.get(l.get(i).count));
-				System.out.println(l.get(i).getLabel() + "    " + l.get(i).getDistance());
-				Thread.sleep(15000);
-			}
-		}
+		fw.close();
 	}
 
 	public void train(VFSGroupDataset<FImage> groupedImages) {
 		vectorList = configure(groupedImages);
 	}
+	
+	
+	
+	
+	public String decideBest(List<Result> list) {
+		Map<String, Integer> names = new HashMap<String,Integer>();
+		
+		for(int i = 0; i<k; i++) {
+			Integer count = names.get(list.get(i).getLabel());;
+		    names.put(list.get(i).getLabel(), count == null ? 1 : count +1 );
+		}
+		
+		Entry<String, Integer> nameSearch = null;
+		for( Entry<String,Integer> entry : names.entrySet()) {		
+			if(nameSearch == null || entry.getValue()> nameSearch.getValue()){
+				nameSearch = entry;
+			}
+		}
+		return nameSearch.getKey();
+	}
 
+	
+	
+	
 	public HashMap<String, List<Vector<Float>>> configure(VFSGroupDataset<FImage> images){
 
 		HashMap<String, List<Vector<Float>>> newVectorList = new HashMap<String, List<Vector<Float>>>();
@@ -96,12 +115,13 @@ public class KNClassifier {
 
 
 
-	public List<Vector<Float>> configure(VFSListDataset<FImage> images){
+	public List<Vectors> configure(VFSListDataset<FImage> images){
 
-		List<Vector<Float>> newVectorList = new ArrayList<Vector<Float>>();
+		List<Vectors> newVectorList = new ArrayList<Vectors>();
 
 
 		for(FImage img : images) {
+			int index = images.indexOf(img);
 			if(img.getHeight()>img.getWidth()) {
 				img = img.extractCenter(img.getWidth(), img.getWidth());						
 			}else if(img.getHeight()<img.getWidth()) {
@@ -110,8 +130,8 @@ public class KNClassifier {
 			img.processInplace(new ResizeProcessor(16, 16, true));
 
 			Vector<Float> vector = flatten(img);
-
-			newVectorList.add(vector);
+			
+			newVectorList.add(new Vectors(vector, images.getID(index)));
 		}
 
 		return newVectorList;
@@ -128,11 +148,33 @@ public class KNClassifier {
 			for(float f : p) {
 
 				vector.add(f);
-
 			}
-
-
 		}
+		float sum = 0;
+		for(float f: vector) {
+			
+			sum += f;
+			
+		}
+		
+		float mean =sum/vector.size();
+		
+		//zero mean the vector
+		for(float f: vector) {
+			f = f-mean;
+		}
+		
+		//make it a unit vector
+		sum = 0;
+		for(float f: vector) {
+			sum+= Math.pow(f, 2);
+		}
+		
+		for(float f: vector) {
+			f = (float) (f/Math.sqrt(sum));
+		}
+		
+		
 
 		return vector;
 	}
@@ -142,11 +184,41 @@ public class KNClassifier {
 		@Override
 		public int compare(Result r1, Result r2) {
 
-			return ((int)(r1.getDistance()) - (int)(r2.getDistance()));
+			return r1.getDistance() < r2.getDistance() ? -1 
+				     : r1.getDistance() > r2.getDistance() ? 1 
+				     : 0;
 
 
 		}
 
+	}
+	
+	class Vectors{
+		
+		public Vector<Float> getVector() {
+			return vector;
+		}
+
+		public void setVector(Vector<Float> vector) {
+			this.vector = vector;
+		}
+
+		public String getImgName() {
+			return imgName;
+		}
+
+		public void setImgName(String imgName) {
+			this.imgName = imgName;
+		}
+
+		Vector<Float> vector;
+		String imgName;
+
+		public Vectors(Vector<Float> vector, String id) {
+			this.vector =vector;
+			this.imgName = id;
+		}
+		
 	}
 
 
@@ -160,12 +232,12 @@ public class KNClassifier {
 			this.label = label;
 		}
 
-		public int getCount() {
-			return count;
+		public String getName() {
+			return name;
 		}
 
-		public void setCount(int count) {
-			this.count = count;
+		public void setName(String name) {
+			this.name = name;
 		}
 
 		public float getDistance() {
@@ -177,13 +249,13 @@ public class KNClassifier {
 		}
 
 		String label;
-		int count;
+		String name;
 		float distance;
 
-		public Result(String label, int count, float distance) {
+		public Result(String label, String name, float distance) {
 
 			this.label = label;
-			this.count = count;
+			this.name = name;
 			this.distance = distance;
 
 		}

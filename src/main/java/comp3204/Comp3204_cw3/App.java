@@ -8,6 +8,7 @@ import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Map.Entry;
 
 /**
@@ -16,14 +17,14 @@ import java.util.Map.Entry;
  */
 public class App 
 {
-    public static void main( String[] args ) throws FileSystemException, FileNotFoundException, InterruptedException
+    public static void main( String[] args ) throws InterruptedException, IOException
     {
     	VFSGroupDataset<FImage> groupedTrainImages = new VFSGroupDataset<FImage>("/home/somax/Desktop/University/comp3204/training", ImageUtilities.FIMAGE_READER);
     	
     	VFSListDataset<FImage> TestImages = new VFSListDataset<FImage>("/home/somax/Desktop/University/comp3204/testing", ImageUtilities.FIMAGE_READER);
     	
-    	
-        KNClassifier kNClassifier = new KNClassifier();
+    	int k = 5;
+        KNClassifier kNClassifier = new KNClassifier(k);
         
         kNClassifier.train(groupedTrainImages);
         kNClassifier.test(TestImages);
