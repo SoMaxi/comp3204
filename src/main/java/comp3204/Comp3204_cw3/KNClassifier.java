@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Vector;
 
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
@@ -21,22 +20,41 @@ import org.openimaj.image.processing.resize.ResizeProcessor;
 import org.openimaj.util.array.ArrayUtils;
 
 public class KNClassifier {
+	//variable for the K value
     private int K;
-	HashMap<String, List<Vector<Float>>> vectorList;
+
+    //TinyImage feature size
 	private final int img_size = 16;
-    private List<DoubleFV> vectors;
-	private List<String> labels;
-	private List<DoubleFV> testVectors;
-	private List<String> testImgNames;
-	VFSGroupDataset<FImage> groupedImages;
+	
+	
+	//Creating lists for feature vectors of both test and training images
+    private List<DoubleFV> trainVectors,testVectors;
+    
+    //Lists for test image names and the category labels from the training set.
+	private List<String> categories, testImgNames;
+
+	
+	
+	//constructor to set up the K value
 	public KNClassifier(int k) {
 		this.K = k;
 	}
 
+	
 	public void test(VFSListDataset<FImage> testImages) throws InterruptedException, IOException {
+		
+		//instantiating the Lists for test dataset
 		testImgNames = new ArrayList<String>();
 		testVectors = new ArrayList<DoubleFV>();
+		
+		//Configure class to create 1D normalized vectors with 0 mean.
 		Configure config = new Configure();
+		
+		
+		
+		
+		
+		//for each image in test image set create a Feature Vector (Using Configure class) and save its name in a separate list.
 		int count = 0;
 		for(FImage img : testImages) {
 			testVectors.add(config.extractFeature(img));
@@ -45,54 +63,79 @@ public class KNClassifier {
 		}
 		
 		
+		//List of class Result to save distance to each training image and the training image's category.
 		List<Result> results;
+		
+		//Map which maps the name of the testing picture to the results against every test image.
 		Map<String, List<Result>> resultsList = new HashMap<String, List<Result>>();
+		
+		
+		
+		
+		//For every testing image vector in testVectors
 		int testCount = 0;
-		
-		
-		
-		
 		for(DoubleFV test : testVectors ) {
 			count = 0;
 			results = new ArrayList<Result>();
-			for(DoubleFV trained : vectors) {
+			//Calculate distance to every training image in trainVectors
+			for(DoubleFV trained : trainVectors) {
 							double distance = 0;
+							
+							//Euclidean Distance calculation for every point in test and training vectors
 							for(int i = 0; i<test.length(); i++) {
 								distance += Math.pow(test.get(i)-trained.get(i), 2);
 							}
 							distance =  Math.sqrt(distance);
-							results.add(new Result(labels.get(count), distance));
+							//Euclidean Distance END
+							
+							//add every results to a List<Result> saving training image's category and distanc towards it
+							results.add(new Result(categories.get(count), distance));
 							count++;
 			}
 			
+			
+			//Sorting all of the results for every test vector in testVectors using a self-defined comparator
 			Collections.sort(results, new ResultSorter());
+			
+			//Mapping name of testing image to its Result
 			resultsList.put(testImgNames.get(testCount), results);
 			testCount++;
 			
 		}
 		
-		
-	BufferedWriter fw = new BufferedWriter(new FileWriter("run1.txt"));
+		//Opening the bufferedWriter to write to file named run1.txt
+			BufferedWriter fw = new BufferedWriter(new FileWriter("run1.txt"));
+			
+			//For every entry in the map, i.e. for every Tested Image name. 
 			for(Entry<String, List<Result>> l : resultsList.entrySet()) {
+				
+				//Write the name of the image to file and pass the list into a decideBest() method to decide classify the category
 				fw.write(l.getKey() + "   " + decideBest(l.getValue()));
 				fw.newLine();
 			
 			}
-
+			
+			
+		//Closing the writing stream
 		fw.close();
 	}
 
 	public void train(VFSGroupDataset<FImage> groupedImages) {
-		vectors = new ArrayList<DoubleFV>();
-		labels = new ArrayList<String>();
-		this.groupedImages = groupedImages;
+		//Instantiating the lists for train dataset
+		trainVectors = new ArrayList<DoubleFV>();
+		categories = new ArrayList<String>();
+	
+		//Configure class to create 1D normalized vectors with 0 mean.
 		Configure config = new Configure();
 		
-		for(String label : groupedImages.keySet()) {
+		
+		//for every entry in the VFSGroupDataset
+		for(Entry<String, VFSListDataset<FImage>>  e : groupedImages.entrySet()) {
 			
-			for(FImage img : groupedImages.get(label)) {
-				labels.add(label);
-				vectors.add(config.extractFeature(img));
+			//for every image in the category, i.e. e.getKey(), save the category name to categories and create 1D vector, saving it to a list
+			for(FImage img : groupedImages.get(e.getKey())) {
+				categories.add(e.getKey());
+				trainVectors.add(config.extractFeature(img));
 			}
 		}		
 	}
@@ -101,27 +144,44 @@ public class KNClassifier {
 	
 	
 	public String decideBest(List<Result> list) {
-		Map<String, Integer> names = new HashMap<String,Integer>();
+		
+		//Map for storing categories and amounts of time they occur
+		Map<String, Integer> countedCategories = new HashMap<String,Integer>();
 		
 		
-		
-		
+		//from 0 to K, create a map with first K values and the amount of time they occur
 		for(int i = 0; i<K; i++) {
-			Integer count = names.get(list.get(i).getLabel());
-		    names.put(list.get(i).getLabel(), count == null ? 1 : count +1 );
+			
+			//get the value at the given key, if no value at the key return null
+			Integer count = countedCategories.get(list.get(i).getLabel());
+			
+			//put a value on the given key, if the count equals null, this means that the value occurs the first time, so 1 is put into the map. 
+			//Otherwise just increases the value already there by 1
+		    countedCategories.put(list.get(i).getLabel(), count == null ? 1 : count +1 );
 		}
-				
+		
+		//create a to store the category and the amount of time it occurs
 		Entry<String, Integer> nameSearch = null;
-		for( Entry<String,Integer> entry : names.entrySet()) {		
+		
+		//for every entry in the counted categories
+		for( Entry<String,Integer> entry : countedCategories.entrySet()) {
+			
+			//if nameSearch is null, i.e. the for loop is in its first run, then set it to the current entry
+			//or if the number of times the name occurs in the current entry, i.e. entry.getValue(), is bigger than the previous entry.getValue,
+			//then make nameSearch equal to currently iterated entry
 			if(nameSearch == null || entry.getValue()> nameSearch.getValue()){
 				nameSearch = entry;
 			}
+			//goes through the whole map of countedCategories and selects the one with biggest value
+			
 		}
+		//returns the name of the most occuring neighbour, thus decides on the category of an image
 		return nameSearch.getKey();
 	}
 
 	
 
+	//custom comparator class, sorts the list in ascending order
 	class ResultSorter implements Comparator<Result>{
 
 		@Override
@@ -137,6 +197,8 @@ public class KNClassifier {
 	}
 
 
+	
+	//a custom class to store how far away is each training image from the test image. also saves the name of the training image (i.e. class/category)
 	class Result{
 		public String getLabel() {
 			return label;
@@ -166,38 +228,51 @@ public class KNClassifier {
 	}
 
 	
+	
+	//configure class is a feature extractor which extracts a DoubleFV feature vector from a given image,
+	// this returns a 16x16 tinyimage feature
 	class Configure implements FeatureExtractor<DoubleFV,FImage>{
 		
 	
 		public DoubleFV extractFeature(FImage img) {
 			
+			//crops the image to its smallest side being both sides
 			if(img.getHeight()>img.getWidth()) {
 				img = img.extractCenter(img.getWidth(), img.getWidth());						
 			}else if(img.getHeight()<img.getWidth()) {
 				img = img.extractCenter(img.getHeight(), img.getHeight());
 			}
 			
+			//resizes the image to img_size (16)
 			img = img.processInplace(new ResizeProcessor(img_size, img_size));
 			
 			
-			DoubleFV vector = new DoubleFV(ArrayUtils.reshape(ArrayUtils.convertToDouble(img.pixels)));
+			//create a size variable to define the size of the vector
+			int size = (ArrayUtils.reshape(ArrayUtils.convertToDouble(img.pixels))).length;
+			System.out.println(size);
 			
 			
 			float sum = 0;
+			//for every float value add it to the sum
 			for(float f: ArrayUtils.reshape(img.pixels)) {
 				sum += f;
 			}
-			float mean =sum/vector.length();
+			//work out the mean of the vector
+			float mean =sum/size;
+			
 			
 			//zero mean the vector
-			float[] v = new float[(vector.length())];
+			float[] v = new float[size];
 			int count = 0;
 			for(float f: ArrayUtils.reshape(img.pixels)) {
 				f = f-mean;
 				v[count] = f;
 				count++;
 			}
-			vector = new DoubleFV(ArrayUtils.convertToDouble(v));
+			//create a DoubleFV variable using the array of floats
+			DoubleFV vector = new DoubleFV(ArrayUtils.convertToDouble(v));
+			
+			//make the vector a unit vector.
 			vector.normaliseFV();
 			
 			return vector;
