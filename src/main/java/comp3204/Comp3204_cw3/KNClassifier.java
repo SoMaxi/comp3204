@@ -15,50 +15,93 @@ import java.util.Vector;
 
 import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
+import org.openimaj.feature.DoubleFV;
+import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.processing.resize.ResizeProcessor;
+import org.openimaj.knn.DoubleNearestNeighboursExact;
+import org.openimaj.util.array.ArrayUtils;
 
 public class KNClassifier {
-	int k;
+    private int K;
 	HashMap<String, List<Vector<Float>>> vectorList;
-
+	private final int img_size = 16;
+    private List<DoubleFV> vectors;
+	private List<String> labels;
+	private List<DoubleFV> testVectors;
+	private List<String> testImgNames;
+	VFSGroupDataset<FImage> groupedImages;
+	private DoubleNearestNeighboursExact knn;
 	public KNClassifier(int k) {
-		this.k = k;
+		this.K = k;
 	}
 
 	public void test(VFSListDataset<FImage> testImages) throws InterruptedException, IOException {
-
-		List<Vectors> testVectors  = configure(testImages);
-		List<Result> results = new ArrayList<Result>();
-		List<List<Result>> resultsList = new ArrayList<List<Result>>();
-		for(Vectors b : testVectors ) {
-			for(String label : vectorList.keySet()) {
-				for(Vector<Float> v : vectorList.get(label)) {
-					float distance = 0;
-					for(int i = 0; i<b.getVector().size(); i++) {
-						distance += Math.pow(b.getVector().get(i)-v.get(i), 2);
-					}
-					distance = (float) Math.sqrt(distance);
-					results.add(new Result(label, b.getImgName(), distance));
-				}
+		testImgNames = new ArrayList<String>();
+		testVectors = new ArrayList<DoubleFV>();
+		Configure config = new Configure();
+		int count = 0;
+		for(FImage img : testImages) {
+			testVectors.add(config.extractFeature(img));
+			testImgNames.add(testImages.getID(count));
+			count++;
+		}
+		
+		
+		List<Result> results;
+		Map<String, List<Result>> resultsList = new HashMap<String, List<Result>>();
+		int testCount = 0;
+		
+		
+		
+		
+		for(DoubleFV test : testVectors ) {
+			count = 0;
+			results = new ArrayList<Result>();
+			for(DoubleFV trained : vectors) {
+				
+						
+							double distance = 0;
+							for(int i = 0; i<test.length(); i++) {
+								distance += Math.pow(test.get(i)-trained.get(i), 2);
+							}
+							distance =  Math.sqrt(distance);
+							results.add(new Result(labels.get(count), distance));
+							count++;
 			}
-			resultsList.add(results);
+			
+			Collections.sort(results, new ResultSorter());
+			resultsList.put(testImgNames.get(testCount), results);
+			testCount++;
+			
 		}
 		
 		
-		FileWriter fw = null;
-		for(List<Result> l : resultsList) {
-			Collections.sort(l, new ResultSorter());
-			fw = new FileWriter("run1.txt");
-			fw.write(l.get(0).getName() + "   " + decideBest(l));
-			System.out.println(l.get(0).getName() + "   " + decideBest(l));
-		}
+	BufferedWriter fw = new BufferedWriter(new FileWriter("run1.txt"));
+			for(Entry<String, List<Result>> l : resultsList.entrySet()) {
+				
+				fw.write(l.getKey() + "   " + decideBest(l.getValue()));
+				fw.newLine();
+				
+			}
+
 		fw.close();
 	}
 
 	public void train(VFSGroupDataset<FImage> groupedImages) {
-		vectorList = configure(groupedImages);
+		vectors = new ArrayList<DoubleFV>();
+		labels = new ArrayList<String>();
+		this.groupedImages = groupedImages;
+		Configure config = new Configure();
+		
+		for(String label : groupedImages.keySet()) {
+			
+			for(FImage img : groupedImages.get(label)) {
+				labels.add(label);
+				vectors.add(config.extractFeature(img));
+			}
+		}		
 	}
 	
 	
@@ -67,8 +110,8 @@ public class KNClassifier {
 	public String decideBest(List<Result> list) {
 		Map<String, Integer> names = new HashMap<String,Integer>();
 		
-		for(int i = 0; i<k; i++) {
-			Integer count = names.get(list.get(i).getLabel());;
+		for(int i = 0; i<K; i++) {
+			Integer count = names.get(list.get(i).getLabel());
 		    names.put(list.get(i).getLabel(), count == null ? 1 : count +1 );
 		}
 		
@@ -82,102 +125,6 @@ public class KNClassifier {
 	}
 
 	
-	
-	
-	public HashMap<String, List<Vector<Float>>> configure(VFSGroupDataset<FImage> images){
-
-		HashMap<String, List<Vector<Float>>> newVectorList = new HashMap<String, List<Vector<Float>>>();
-
-		for(String label : images.keySet()) {
-			List<Vector<Float>> newList = new ArrayList<Vector<Float>>();
-			for(FImage img : images.get(label)) {
-				if(img.getHeight()>img.getWidth()) {
-					img = img.extractCenter(img.getWidth(), img.getWidth());						
-				}else if(img.getHeight()<img.getWidth()) {
-					img = img.extractCenter(img.getHeight(), img.getHeight());
-				}
-				img.processInplace(new ResizeProcessor(16, 16, true));
-
-				Vector<Float> vector = flatten(img);
-
-				newList.add(vector);
-			}
-
-			newVectorList.put(label, newList);
-
-		}
-
-
-		return newVectorList;
-
-
-	}
-
-
-
-	public List<Vectors> configure(VFSListDataset<FImage> images){
-
-		List<Vectors> newVectorList = new ArrayList<Vectors>();
-
-
-		for(FImage img : images) {
-			int index = images.indexOf(img);
-			if(img.getHeight()>img.getWidth()) {
-				img = img.extractCenter(img.getWidth(), img.getWidth());						
-			}else if(img.getHeight()<img.getWidth()) {
-				img = img.extractCenter(img.getHeight(), img.getHeight());
-			}
-			img.processInplace(new ResizeProcessor(16, 16, true));
-
-			Vector<Float> vector = flatten(img);
-			
-			newVectorList.add(new Vectors(vector, images.getID(index)));
-		}
-
-		return newVectorList;
-
-
-	}
-
-	public Vector<Float> flatten(FImage image) {
-
-		Vector<Float> vector = new Vector<Float>();
-
-		for(float[] p : image.pixels) {
-
-			for(float f : p) {
-
-				vector.add(f);
-			}
-		}
-		float sum = 0;
-		for(float f: vector) {
-			
-			sum += f;
-			
-		}
-		
-		float mean =sum/vector.size();
-		
-		//zero mean the vector
-		for(float f: vector) {
-			f = f-mean;
-		}
-		
-		//make it a unit vector
-		sum = 0;
-		for(float f: vector) {
-			sum+= Math.pow(f, 2);
-		}
-		
-		for(float f: vector) {
-			f = (float) (f/Math.sqrt(sum));
-		}
-		
-		
-
-		return vector;
-	}
 
 	class ResultSorter implements Comparator<Result>{
 
@@ -192,35 +139,6 @@ public class KNClassifier {
 		}
 
 	}
-	
-	class Vectors{
-		
-		public Vector<Float> getVector() {
-			return vector;
-		}
-
-		public void setVector(Vector<Float> vector) {
-			this.vector = vector;
-		}
-
-		public String getImgName() {
-			return imgName;
-		}
-
-		public void setImgName(String imgName) {
-			this.imgName = imgName;
-		}
-
-		Vector<Float> vector;
-		String imgName;
-
-		public Vectors(Vector<Float> vector, String id) {
-			this.vector =vector;
-			this.imgName = id;
-		}
-		
-	}
-
 
 
 	class Result{
@@ -232,15 +150,7 @@ public class KNClassifier {
 			this.label = label;
 		}
 
-		public String getName() {
-			return name;
-		}
-
-		public void setName(String name) {
-			this.name = name;
-		}
-
-		public float getDistance() {
+		public double getDistance() {
 			return distance;
 		}
 
@@ -249,22 +159,55 @@ public class KNClassifier {
 		}
 
 		String label;
-		String name;
-		float distance;
+		double distance;
 
-		public Result(String label, String name, float distance) {
+		public Result(String label, double d) {
 
 			this.label = label;
-			this.name = name;
-			this.distance = distance;
+			this.distance = d;
 
 		}
-
-
-
-
 	}
 
+	
+	class Configure implements FeatureExtractor<DoubleFV,FImage>{
+		
+	
+		public DoubleFV extractFeature(FImage img) {
+			
+			if(img.getHeight()>img.getWidth()) {
+				img = img.extractCenter(img.getWidth(), img.getWidth());						
+			}else if(img.getHeight()<img.getWidth()) {
+				img = img.extractCenter(img.getHeight(), img.getHeight());
+			}
+			
+			img = img.processInplace(new ResizeProcessor(img_size, img_size));
+			
+			
+			DoubleFV vector = new DoubleFV(ArrayUtils.reshape(ArrayUtils.convertToDouble(img.pixels)));
+			
+			
+			float sum = 0;
+			for(float f: ArrayUtils.reshape(img.pixels)) {
+				sum += f;
+			}
+			float mean =sum/vector.length();
+			
+			//zero mean the vector
+			float[] v = new float[(vector.length())];
+			int count = 0;
+			for(float f: ArrayUtils.reshape(img.pixels)) {
+				f = f-mean;
+				v[count] = f;
+				count++;
+			}
+			vector = new DoubleFV(ArrayUtils.convertToDouble(v));
+			vector.normaliseFV();
+			
+			return vector;
+		}
+		
+	}
 
 }
 
