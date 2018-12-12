@@ -17,6 +17,7 @@ import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.FeatureExtractor;
 import org.openimaj.image.FImage;
 import org.openimaj.image.processing.resize.ResizeProcessor;
+
 import org.openimaj.util.array.ArrayUtils;
 
 public class KNClassifier {
