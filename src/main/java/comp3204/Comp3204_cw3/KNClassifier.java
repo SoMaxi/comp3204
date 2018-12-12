@@ -1,9 +1,7 @@
 package comp3204.Comp3204_cw3;
 import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -17,10 +15,8 @@ import org.openimaj.data.dataset.VFSGroupDataset;
 import org.openimaj.data.dataset.VFSListDataset;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.FeatureExtractor;
-import org.openimaj.image.DisplayUtilities;
 import org.openimaj.image.FImage;
 import org.openimaj.image.processing.resize.ResizeProcessor;
-import org.openimaj.knn.DoubleNearestNeighboursExact;
 import org.openimaj.util.array.ArrayUtils;
 
 public class KNClassifier {
@@ -32,7 +28,6 @@ public class KNClassifier {
 	private List<DoubleFV> testVectors;
 	private List<String> testImgNames;
 	VFSGroupDataset<FImage> groupedImages;
-	private DoubleNearestNeighboursExact knn;
 	public KNClassifier(int k) {
 		this.K = k;
 	}
@@ -60,8 +55,6 @@ public class KNClassifier {
 			count = 0;
 			results = new ArrayList<Result>();
 			for(DoubleFV trained : vectors) {
-				
-						
 							double distance = 0;
 							for(int i = 0; i<test.length(); i++) {
 								distance += Math.pow(test.get(i)-trained.get(i), 2);
@@ -80,10 +73,9 @@ public class KNClassifier {
 		
 	BufferedWriter fw = new BufferedWriter(new FileWriter("run1.txt"));
 			for(Entry<String, List<Result>> l : resultsList.entrySet()) {
-				
 				fw.write(l.getKey() + "   " + decideBest(l.getValue()));
 				fw.newLine();
-				
+			
 			}
 
 		fw.close();
@@ -110,11 +102,14 @@ public class KNClassifier {
 	public String decideBest(List<Result> list) {
 		Map<String, Integer> names = new HashMap<String,Integer>();
 		
+		
+		
+		
 		for(int i = 0; i<K; i++) {
 			Integer count = names.get(list.get(i).getLabel());
 		    names.put(list.get(i).getLabel(), count == null ? 1 : count +1 );
 		}
-		
+				
 		Entry<String, Integer> nameSearch = null;
 		for( Entry<String,Integer> entry : names.entrySet()) {		
 			if(nameSearch == null || entry.getValue()> nameSearch.getValue()){

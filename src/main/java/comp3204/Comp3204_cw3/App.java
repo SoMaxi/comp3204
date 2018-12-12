@@ -17,16 +17,16 @@ import java.util.Map.Entry;
  */
 public class App 
 {
+	private final static int K_Neighbours = 20;
     public static void main( String[] args ) throws InterruptedException, IOException
     {
     	VFSGroupDataset<FImage> groupedTrainImages = new VFSGroupDataset<FImage>("/home/somax/Desktop/University/comp3204/training", ImageUtilities.FIMAGE_READER);
     	
-    	VFSListDataset<FImage> TestImages = new VFSListDataset<FImage>("/home/somax/Desktop/University/comp3204/testing", ImageUtilities.FIMAGE_READER);
+    	VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("/home/somax/Desktop/University/comp3204/testing", ImageUtilities.FIMAGE_READER);
     	
-    	int k = 5;
-        KNClassifier kNClassifier = new KNClassifier(k);
+        KNClassifier kNClassifier = new KNClassifier(K_Neighbours);
         
         kNClassifier.train(groupedTrainImages);
-        kNClassifier.test(TestImages);
+        kNClassifier.test(testImages);
     }
 }
