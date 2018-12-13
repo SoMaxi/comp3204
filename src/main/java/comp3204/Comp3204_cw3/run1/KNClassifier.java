@@ -138,7 +138,7 @@ public class KNClassifier {
 			for(int i=0; i < sortingList.size(); i++) {
 				
 				//writing the image name and the best guess to the file
-				fw.write(sortingList.get(i).getLabel() + "   " + sortingList.get(i).getBestGuess());
+				fw.write(sortingList.get(i).getLabel() + " " + sortingList.get(i).getBestGuess());
 				fw.newLine();
 			}
 			
