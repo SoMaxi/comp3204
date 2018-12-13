@@ -95,7 +95,18 @@ public class KNClassifier {
 			
 			
 			//Sorting all of the results for every test vector in testVectors using a self-defined comparator
-			Collections.sort(results, new ResultSorter());
+			Collections.sort(results, new Comparator<Result>() {
+				
+				//comparing the distances to every test image and sorting them based on that
+				public int compare(Result r1, Result r2) {
+
+					return r1.getDistance() < r2.getDistance() ? -1 
+						     : r1.getDistance() > r2.getDistance() ? 1 
+						     : 0;
+
+
+				}
+			});
 			
 			//Mapping name of testing image to its Result
 			resultsList.put(testImgNames.get(testCount), results);
@@ -104,17 +115,32 @@ public class KNClassifier {
 		}
 		
 		//Opening the bufferedWriter to write to file named run1.txt
-			BufferedWriter fw = new BufferedWriter(new FileWriter("run1.txt"));
 			
+			
+			
+			List<Result> sortingList = new ArrayList<Result>();
 			//For every entry in the map, i.e. for every Tested Image name. 
 			for(Entry<String, List<Result>> l : resultsList.entrySet()) {
-				
-				//Write the name of the image to file and pass the list into a decideBest() method to decide classify the category
-				fw.write(l.getKey() + "   " + decideBest(l.getValue()));
-				fw.newLine();
-			
+				//save the name of the image to the list and pass the result list into a decideBest() method to classify the category
+				sortingList.add(new Result(l.getKey(),decideBest(l.getValue())));
 			}
 			
+			Collections.sort(sortingList, new Comparator<Result>() {
+				//comparing the image names based on their integer parts and then sorting them
+				public int compare(Result r1, Result r2) {
+					return r1.getIntName() < r2.getIntName() ? -1 
+						     : r1.getIntName() > r2.getIntName() ? 1 
+						     : 0;
+				}
+				
+			});
+			BufferedWriter fw = new BufferedWriter(new FileWriter("run1.txt"));
+			for(int i=0; i < sortingList.size(); i++) {
+				
+				//writing the image name and the best guess to the file
+				fw.write(sortingList.get(i).getLabel() + "   " + sortingList.get(i).getBestGuess());
+				fw.newLine();
+			}
 			
 		//Closing the writing stream
 		fw.close();
@@ -182,24 +208,28 @@ public class KNClassifier {
 	
 
 	//custom comparator class, sorts the list in ascending order
-	class ResultSorter implements Comparator<Result>{
 
-		@Override
-		public int compare(Result r1, Result r2) {
-
-			return r1.getDistance() < r2.getDistance() ? -1 
-				     : r1.getDistance() > r2.getDistance() ? 1 
-				     : 0;
-
-
-		}
-
-	}
 
 
 	
 	//a custom class to store how far away is each training image from the test image. also saves the name of the training image (i.e. class/category)
 	class Result{
+		public String getBestGuess() {
+			return bestGuess;
+		}
+
+		public void setBestGuess(String bestGuess) {
+			this.bestGuess = bestGuess;
+		}
+
+		public int getIntName() {
+			return intName;
+		}
+
+		public void setIntName(int intName) {
+			this.intName = intName;
+		}
+
 		public String getLabel() {
 			return label;
 		}
@@ -218,11 +248,23 @@ public class KNClassifier {
 
 		String label;
 		double distance;
-
+		String bestGuess;
+		int intName;
 		public Result(String label, double d) {
 
 			this.label = label;
 			this.distance = d;
+
+		}
+		
+		
+		public Result(String label, String bestGuess) {
+
+			
+			//saving the integer part of the image name
+			this.intName = Integer.parseInt(label.substring(0, label.length() - 4));
+			this.label = label;
+			this.bestGuess = bestGuess;
 
 		}
 	}
@@ -248,9 +290,7 @@ public class KNClassifier {
 			
 			
 			//create a size variable to define the size of the vector
-			int size = (ArrayUtils.reshape(ArrayUtils.convertToDouble(img.pixels))).length;
-			System.out.println(size);
-			
+			int size = (ArrayUtils.reshape(ArrayUtils.convertToDouble(img.pixels))).length;	
 			
 			float sum = 0;
 			//for every float value add it to the sum
@@ -281,5 +321,4 @@ public class KNClassifier {
 	}
 
 }
-
 
