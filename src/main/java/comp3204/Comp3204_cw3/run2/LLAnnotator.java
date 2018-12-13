@@ -45,6 +45,8 @@ public class LLAnnotator{
 		
 		return annotator.classify(image);
 	}
+	
+	
 	//the method to extract pixel patches
 	public static List<LocalFeature<SpatialLocation, FloatFV>> extract(FImage image, float gap, float patchSize){
         List<LocalFeature<SpatialLocation, FloatFV>> patchesList = new ArrayList<LocalFeature<SpatialLocation, FloatFV>>();
@@ -70,10 +72,10 @@ public class LLAnnotator{
 							vector[count]=image.pixels[i+f][j+z];
 							count++;
 							//converting the patches for convenience's sake
-							SpatialLocation spatial = new SpatialLocation(i, j);
 							FloatFV convVector= new FloatFV(vector);
-							LocalFeature<SpatialLocation, FloatFV> lf = new LocalFeatureImpl<SpatialLocation, FloatFV>(spatial,convVector);
-					        patchesList.add(lf);
+							SpatialLocation spatial = new SpatialLocation(i, j);
+							LocalFeature<SpatialLocation, FloatFV> localFeature = new LocalFeatureImpl<SpatialLocation, FloatFV>(spatial,convVector);
+					        patchesList.add(localFeature);
 						}
 				}
 			internalCount++;
