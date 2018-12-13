@@ -1,10 +1,9 @@
 package comp3204.Comp3204_cw3.run2;
-
-
 import java.util.ArrayList;
 import java.util.List;
 import org.openimaj.data.dataset.Dataset;
 import org.openimaj.data.dataset.VFSGroupDataset;
+import org.openimaj.experiment.dataset.split.GroupedRandomSplitter;
 import org.openimaj.experiment.evaluation.classification.ClassificationResult;
 import org.openimaj.feature.DoubleFV;
 import org.openimaj.feature.FeatureExtractor;
@@ -33,7 +32,9 @@ public class LLAnnotator{
 	 * continue to create the linear annotator and train it with the inbuilt train method
 	 */
 	public void train(VFSGroupDataset<FImage> trainingSet) {
-		HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(trainingSet);
+		//taking 15 images of each class
+		GroupedRandomSplitter<String, FImage> rand = new GroupedRandomSplitter<String, FImage>(trainingSet, 15, 0, 0);
+		HardAssigner<float[], float[], IntFloatPair> assigner = trainQuantiser(rand.getTrainingDataset());
 		FeatureExtractor<DoubleFV, FImage> extractor = new PatchClusterFeatureExtractor(assigner);
 
         // Create and train a linear classifier.
@@ -45,8 +46,6 @@ public class LLAnnotator{
 		
 		return annotator.classify(image);
 	}
-	
-	
 	//the method to extract pixel patches
 	public static List<LocalFeature<SpatialLocation, FloatFV>> extract(FImage image, float gap, float patchSize){
         List<LocalFeature<SpatialLocation, FloatFV>> patchesList = new ArrayList<LocalFeature<SpatialLocation, FloatFV>>();
@@ -56,7 +55,6 @@ public class LLAnnotator{
 		int count=0;
 		//declaring a vector of the correct size
 		int size=(int) (patchSize*patchSize);
-		float[] vector=new float[size];
 		//acquiring image dimensions
 		int sizeHorizontal = image.pixels[0].length;
 		int sizeVertical=image.pixels.length;
@@ -66,18 +64,23 @@ public class LLAnnotator{
 			for(int j=0;j<sizeVertical;j++) {
 				//conditions to be met to extract a patch
 				if(internalCount%gap==0 && sizeHorizontal-i>=patchSize && sizeVertical-j>=patchSize) {
+					float[] vector=new float[size];
 					//extracting the patch
 					for(int f=0;i<8;i++)
 						for(int z=0;z<8;z++) {
 							vector[count]=image.pixels[i+f][j+z];
 							count++;
-							//converting the patches for convenience's sake
-							FloatFV convVector= new FloatFV(vector);
-							SpatialLocation spatial = new SpatialLocation(i, j);
-							LocalFeature<SpatialLocation, FloatFV> localFeature = new LocalFeatureImpl<SpatialLocation, FloatFV>(spatial,convVector);
-					        patchesList.add(localFeature);
+							
+							
 						}
+					//converting the patches for convenience's sake
+					SpatialLocation spatial = new SpatialLocation(i, j);
+					FloatFV convVector= new FloatFV(vector);
+					LocalFeature<SpatialLocation, FloatFV> lf = new LocalFeatureImpl<SpatialLocation, FloatFV>(spatial,convVector);
+			        patchesList.add(lf);
+			        count=0;
 				}
+				
 			internalCount++;
 			}
 		
@@ -87,20 +90,24 @@ public class LLAnnotator{
 	//creating a HardAssigner using K-means as per the cw spec
 	static HardAssigner<float[], float[], IntFloatPair> trainQuantiser(Dataset<FImage> sample) {
 		List<float[]> allkeys = new ArrayList<float[]>();
-
-        //extract patches while setting the interval between them and the size in the extract method    
+        //extract patches while setting the interval between them and the size in the extract method
+		System.out.println("Beginning extraction");
 		for (FImage image : sample) {
 			List<LocalFeature<SpatialLocation, FloatFV>> sampleList = extract(image, 4, 8);
 			for(LocalFeature<SpatialLocation, FloatFV> local : sampleList){
 				allkeys.add(local.getFeatureVector().values);
 			}
 		}
+		System.out.println("Extraction complete"); 
 
-        // performing K-means clustering on the sample of patches   
+        // performing K-means clustering on the sample of patches
+		System.out.println("Clustering"); 
 		FloatKMeans km = FloatKMeans.createKDTreeEnsemble(500);
         float[][] data = allkeys.toArray(new float[][]{});  
 		FloatCentroidsResult result = km.cluster(data);
+		System.out.println("Clustering complete"); 
 		return result.defaultHardAssigner();
+		
 	}
 	//a patch feature extractor based on the assigner
 	class PatchClusterFeatureExtractor implements FeatureExtractor<DoubleFV, FImage> {

@@ -114,7 +114,7 @@ public class KNClassifier {
 			
 		}
 		
-		//Opening the bufferedWriter to write to file named run1.txt
+		
 			
 			
 			
@@ -134,6 +134,9 @@ public class KNClassifier {
 				}
 				
 			});
+			
+			
+			//Opening the bufferedWriter to write to file named run1.txt
 			BufferedWriter fw = new BufferedWriter(new FileWriter("run1.txt"));
 			for(int i=0; i < sortingList.size(); i++) {
 				

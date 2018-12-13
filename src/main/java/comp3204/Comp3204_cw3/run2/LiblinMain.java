@@ -1,4 +1,5 @@
 package comp3204.Comp3204_cw3.run2;
+import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -13,14 +14,15 @@ import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
 import comp3204.Comp3204_cw3.run1.Result;
 public class LiblinMain {
+	
+	
 	public static void main( String[] args ) throws IOException {
-		VFSGroupDataset<FImage> groupedTrainImages = new VFSGroupDataset<FImage>("C:\\Users\\Ivan\\training", ImageUtilities.FIMAGE_READER);
+		VFSGroupDataset<FImage> groupedTrainImages = new VFSGroupDataset<FImage>("/home/somax/Desktop/University/comp3204/training", ImageUtilities.FIMAGE_READER);
 
-		VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("C:\\Users\\Ivan\\testing", ImageUtilities.FIMAGE_READER);
+		VFSListDataset<FImage> testImages = new VFSListDataset<FImage>("/home/somax/Desktop/University/comp3204/testing", ImageUtilities.FIMAGE_READER);
 		LLAnnotator run2=new LLAnnotator();
 		run2.train(groupedTrainImages);
-		FileWriter fw = null;
-		fw = new FileWriter("run2.txt");
+		
 		int counter=0;
 		for(FImage image: testImages) {
 			ClassificationResult<String> predicted = run2.classify(image);
@@ -42,6 +44,7 @@ public class LiblinMain {
 				}
 			});
 			
+			BufferedWriter fw = new BufferedWriter(new FileWriter("run2.txt"));
 			for(int i = 0; i<sortingList.size(); i++) {
 				fw.write(sortingList.get(i).getLabel()+ " " +sortingList.get(i).getBestGuess() + "\n");
 			}
